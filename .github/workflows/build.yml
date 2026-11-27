@@ -1,8 +1,10 @@
-# Builds Reggirizer for Windows (VST3) and macOS (VST3 + AU) on GitHub's servers.
+# Builds Reggirizer (v1) and 07BASED (v2) for Windows (VST3) and macOS (VST3 + AU)
+# on GitHub's servers.
 # - Every push to main: builds, and the zips appear under the run's "Artifacts".
-# - Pushing a version tag (reggirizer-v1, reggirizer-v2, ...): also publishes a
-#   Release titled "Reggirizer v1", "Reggirizer v2", ... with the
-#   zips attached: a public download page you can send to anyone.
+# - Pushing a version tag publishes a Release with that plugin's zips attached,
+#   a public download page you can send to anyone:
+#     reggirizer-v1, reggirizer-v2, ...  ->  "Reggirizer v1" ...
+#     07based-v2, 07based-v3, ...        ->  "07BASED v2" ...
 name: Build plugins
 
 on:
@@ -32,10 +34,16 @@ jobs:
       - name: Get JUCE 8.0.10
         run: git clone --depth 1 --branch 8.0.10 https://github.com/juce-framework/JUCE.git JUCE
 
+      # 07BASED's interface runs in WebView2; its SDK is linked statically so
+      # users don't need anything extra beyond the WebView2 runtime Windows ships with.
+      - name: Get the WebView2 SDK (Windows)
+        if: runner.os == 'Windows'
+        run: nuget install Microsoft.Web.WebView2 -Version 1.0.1901.177 -OutputDirectory webview2
+
       - name: Configure (Windows)
         if: runner.os == 'Windows'
         # No -G: CMake picks whichever Visual Studio the runner has installed.
-        run: cmake -S . -B build -A x64
+        run: cmake -S . -B build -A x64 "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=${{ github.workspace }}/webview2"
 
       - name: Configure (macOS)
         if: runner.os == 'macOS'
@@ -51,6 +59,8 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path build/Reggirizer_artefacts/Release/VST3/Reggirizer.vst3, INSTALL.txt `
                            -DestinationPath dist/Reggirizer-Windows-VST3.zip
+          Compress-Archive -Path build/SevenBased_artefacts/Release/VST3/07BASED.vst3, INSTALL-07BASED.txt `
+                           -DestinationPath dist/07BASED-Windows-VST3.zip
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
@@ -60,10 +70,15 @@ jobs:
           cp -R build/Reggirizer_artefacts/Release/AU/Reggirizer.component INSTALL.txt pkg-au/
           (cd pkg-vst3 && ditto -c -k . ../dist/Reggirizer-macOS-VST3.zip)
           (cd pkg-au && ditto -c -k . ../dist/Reggirizer-macOS-AU.zip)
+          mkdir -p b-vst3 b-au
+          cp -R build/SevenBased_artefacts/Release/VST3/07BASED.vst3 INSTALL-07BASED.txt b-vst3/
+          cp -R build/SevenBased_artefacts/Release/AU/07BASED.component INSTALL-07BASED.txt b-au/
+          (cd b-vst3 && ditto -c -k . ../dist/07BASED-macOS-VST3.zip)
+          (cd b-au && ditto -c -k . ../dist/07BASED-macOS-AU.zip)
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Reggirizer-${{ matrix.label }}
+          name: Plugins-${{ matrix.label }}
           path: dist/*
 
   release:
@@ -80,12 +95,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # The tag says which plugin this release is for.
+          case "$GITHUB_REF_NAME" in
+            07based-*) NAME=07BASED ;;
+            *)         NAME=Reggirizer ;;
+          esac
+          GUIDE=INSTALL.txt
+          [ "$NAME" = 07BASED ] && GUIDE=INSTALL-07BASED.txt
           printf '%s\n' \
-            "Download the zip for your computer, unzip it, and follow INSTALL.txt inside." \
+            "Download the zip for your computer, unzip it, and follow $GUIDE inside." \
             "" \
-            "- **Windows (FL Studio, Ableton, etc.):** Reggirizer-Windows-VST3.zip" \
-            "- **Mac:** Reggirizer-macOS-VST3.zip (or the AU zip for Logic / GarageBand)" > notes.md
-          gh release create "$GITHUB_REF_NAME" dist/* \
+            "- **Windows (FL Studio, Ableton, etc.):** $NAME-Windows-VST3.zip" \
+            "- **Mac:** $NAME-macOS-VST3.zip (or the AU zip for Logic / GarageBand)" > notes.md
+          gh release create "$GITHUB_REF_NAME" dist/$NAME-* \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Reggirizer ${GITHUB_REF_NAME##*-}" \
+            --title "$NAME ${GITHUB_REF_NAME##*-}" \
             --notes-file notes.md

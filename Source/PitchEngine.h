@@ -29,6 +29,10 @@ public:
         float amount = 1.0f;      // 0..1 how much of the correction to apply
         int stabilizer = 1;       // 0 None, 1 Short, 2 Mid, 3 Long: resistance to note flips
         float sustainMs = 80.0f;  // how long the locked note survives breaths / dropouts
+        // 07BASED v2 additions (v1 leaves these at their defaults):
+        float humanize = 0.0f;    // 0..1: long held notes get a slower retune so they keep natural movement
+        bool useMask = false;     // true: tune to exactly the notes in `mask` (pitch classes C..B), ignoring key/scale
+        std::array<bool, 12> mask {};
     };
 
     void prepare (double sampleRate, int numChannels);
@@ -81,6 +85,7 @@ private:
     float unvoicedFor = 0.0f;  // seconds since the last confident pitch
     float lastMidi = -1.0f;    // previous detected pitch, for the look-ahead slope
     float midiSlope = 0.0f;    // semitones per second, smoothed
+    float heldFor = 0.0f;      // seconds the current target note has been held (for humanize)
 
     // --- correction smoothing ---
     float desiredCorrection = 0.0f; // semitones, updated per hop

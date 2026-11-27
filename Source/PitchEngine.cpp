@@ -153,6 +153,7 @@ void PitchEngine::clearTarget()
     unvoicedFor = 0.0f;
     lastMidi = -1.0f;
     midiSlope = 0.0f;
+    heldFor = 0.0f;
     desiredCorrection = 0.0f;
 }
 
@@ -162,6 +163,8 @@ int PitchEngine::chooseTarget (float midi, float hopSeconds)
 
     auto allowed = [&] (int note)
     {
+        if (settings.useMask)
+            return settings.mask[(size_t) ((note % 12 + 12) % 12)];
         const int degree = ((note - settings.key) % 12 + 12) % 12;
         return scale.notes[(size_t) degree];
     };
@@ -240,7 +243,9 @@ void PitchEngine::analyseHop()
             midiSlope = 0.0f;
         lastMidi = midi;
 
+        const int previousTarget = currentTarget;
         currentTarget = chooseTarget (midi, hopSeconds);
+        heldFor = (currentTarget >= 0 && currentTarget == previousTarget) ? heldFor + hopSeconds : 0.0f;
 
         // -3 ms looks up to 15 ms ahead, about the detector's lag behind the output.
         float predicted = midi;
@@ -250,7 +255,8 @@ void PitchEngine::analyseHop()
             predicted += std::clamp (midiSlope * lookAheadSec, -0.5f, 0.5f);
         }
 
-        float correction = (float) currentTarget - predicted;
+        // No allowed note at all (every key switched off): leave the voice alone.
+        float correction = currentTarget >= 0 ? (float) currentTarget - predicted : 0.0f;
         correction = std::clamp (correction, -2.0f, 2.0f) * settings.amount;
         desiredCorrection = correction;
 
@@ -287,7 +293,10 @@ void PitchEngine::process (float* const* chans, int numChannels, int numSamples)
     // Retune speed -> one-pole smoothing coefficient. At 0 ms or below the
     // correction steps straight to each new value: a jump in shift ratio only
     // changes how fast the delay heads move, so it can't click.
-    const float tauSec = settings.speedMs * 0.001f;
+    // Humanize: notes held past ~120 ms ease toward a slower retune (up to +250 ms),
+    // so sustained notes keep their natural movement while quick notes still snap.
+    const float held = std::clamp ((heldFor - 0.12f) / 0.5f, 0.0f, 1.0f);
+    const float tauSec = settings.speedMs * 0.001f + settings.humanize * held * 0.25f;
     const float smoothCoef = tauSec > 0.0f ? 1.0f - std::exp (-1.0f / (tauSec * (float) sr)) : 1.0f;
 
     // Gentle anti-alias low-pass before decimating for analysis.

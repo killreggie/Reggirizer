@@ -1,0 +1,35 @@
+07BASED v2 - INSTALL
+====================
+
+WINDOWS (FL Studio, Ableton, Reaper, ...)
+  1. Unzip 07BASED-Windows-VST3.zip.
+  2. Copy the "07BASED.vst3" folder into:
+       C:\Program Files\Common Files\VST3
+     (Windows will ask for admin permission - click Continue.)
+  3. FL Studio: Options > Manage plugins > Find plugins.
+     Then click an empty insert slot on a mixer track and choose 07BASED.
+  The interface uses Microsoft Edge WebView2, which comes with Windows 10/11.
+  If the window stays blank, install the "WebView2 Runtime" from Microsoft.
+
+MAC
+  1. Unzip 07BASED-macOS-VST3.zip (or the AU zip for Logic / GarageBand).
+  2. Copy the plugin into:
+       VST3: ~/Library/Audio/Plug-Ins/VST3
+       AU:   ~/Library/Audio/Plug-Ins/Components
+     (In Finder press Cmd+Shift+G and paste the path.)
+  3. The plugin isn't signed by Apple, so macOS may block it. If your DAW
+     doesn't show it, open Terminal and run:
+       xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/07BASED.vst3
+       xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/07BASED.component
+  4. Rescan plugins in your DAW.
+
+WHAT'S INSIDE
+  A CRT TV. Pick a disc from the menu, or flip with CH UP / CH DOWN.
+  REGGIRIZER    pitch correction: key dropdown, keyboard, retune speed down
+                to -3 ms, amount, sustain, humanize, note stabilizer.
+  BLU PILL      time + volume patterns locked to your beat (Gross Beat style):
+                64 presets, draw your own points, ATT / REL / TNS, HOLD.
+  GRAPECRUSHER  bitcrusher: bit depth, sample rate, jitter, dither, tone.
+  TRAP CITY     808 distortion with five modes and a BLAST button.
+  BUS           turn effects on/off and drag them into any order.
+  POWER         turns the TV off (and on). Try leaving it off for a while.

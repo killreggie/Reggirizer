@@ -8,3 +8,7 @@ build-win/
 dist/
 pkg-vst3/
 pkg-au/
+build-v2/
+b-vst3/
+b-au/
+webview2/
