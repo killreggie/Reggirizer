@@ -68,6 +68,23 @@ static void testGrapeCrusher()
     const auto crushed = run (1.0f); // 1 bit: a 0.4 sine rounds to zero
     check (rms (crushed, 4800) < 0.02f, "Grapecrusher at 1 bit rounds a quiet sine away");
     check (GrapeCrusher::bitsFor (0.55f) == 6, "bits knob at 0.55 = 6 bits, same as the UI readout");
+
+    // Silence in, silence out: no hiss even with dither + noise turned up, in every mode.
+    for (int mode = 0; mode < 4; ++mode)
+    {
+        GrapeCrusher g2;
+        g2.prepare (sr);
+        GrapeCrusher::Settings loud;
+        loud.dither = 1; loud.noise = 1; loud.mode = mode;
+        g2.setSettings (loud);
+        std::vector<float> quiet (48000, 0.0f);
+        float* qp[1] { quiet.data() };
+        g2.process (qp, 1, (int) quiet.size());
+        float peak = 0;
+        for (float f : quiet) peak = std::max (peak, std::abs (f));
+        if (peak > 1e-6f) { std::printf ("      mode %d silence peak %g\n", mode, peak); }
+        check (peak < 1e-6f, "Grapecrusher adds no static to silence (dither + noise maxed)");
+    }
 }
 
 static void testTrapCity()
@@ -150,6 +167,33 @@ static void testBluPill()
 
 static void testProcessor()
 {
+    {
+        // A freshly loaded 07BASED must pass audio through untouched (all effects off),
+        // just delayed by the reported latency.
+        BasedProcessor fresh;
+        fresh.setPlayConfigDetails (2, 2, 48000, 512);
+        fresh.prepareToPlay (48000, 512);
+        const int L = fresh.getLatencySamples();
+        const auto in = sine (48000, 48000, 440, 0.5f);
+        juce::AudioBuffer<float> b (2, 512);
+        juce::MidiBuffer m;
+        std::vector<float> out;
+        for (size_t at = 0; at + 512 <= in.size(); at += 512)
+        {
+            for (int c = 0; c < 2; ++c)
+                for (int i = 0; i < 512; ++i)
+                    b.setSample (c, i, in[at + (size_t) i]);
+            fresh.processBlock (b, m);
+            for (int i = 0; i < 512; ++i)
+                out.push_back (b.getSample (0, i));
+        }
+        float maxErr = 0;
+        for (size_t i = (size_t) L; i < out.size(); ++i)
+            maxErr = std::max (maxErr, std::abs (out[i] - in[i - (size_t) L]));
+        std::printf ("      fresh plugin max difference from input: %g (latency %d)\n", maxErr, L);
+        check (maxErr < 1e-5f, "a fresh 07BASED (everything off) passes audio through untouched");
+    }
+
     BasedProcessor proc;
     proc.setPlayConfigDetails (2, 2, 48000, 512);
     proc.prepareToPlay (48000, 512);
@@ -158,6 +202,8 @@ static void testProcessor()
     juce::AudioBuffer<float> buf (2, 512);
     juce::MidiBuffer midi;
     juce::Random rng (3);
+    for (auto* id : { "on_rz", "on_bp", "on_gc", "on_tc" })
+        proc.apvts.getParameter (id)->setValueNotifyingHost (1.0f);
     bool finite = true;
     proc.blast();
     for (int b = 0; b < 200; ++b)

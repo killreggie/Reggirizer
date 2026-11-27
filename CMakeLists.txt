@@ -100,7 +100,7 @@ juce_add_binary_data(BasedUIData
         Source/v2/ui/rusty_metal_04.jpg)
 
 juce_add_plugin(SevenBased
-    VERSION 2.0.0
+    VERSION 2.0.1
     COMPANY_NAME "Reggie Audio"
     BUNDLE_ID "com.reggieaudio.07based"
     PLUGIN_MANUFACTURER_CODE Regg

@@ -18,7 +18,7 @@ public:
 
     struct Settings
     {
-        float bits = .55f, dither = .25f, noise = .1f;      // bit depth section
+        float bits = .55f, dither = 0.0f, noise = 0.0f;      // bit depth section
         float rate = .6f, jitter = .2f, smooth = .3f;       // sample-rate section
         float lowCut = .15f, highCut = .7f, tilt = .5f;     // tone
         float in = .5f, mix = .8f, out = .5f;               // output
@@ -81,6 +81,10 @@ public:
             {
                 const float dry = x[n] * inGain;
                 float s = dry;
+                // Envelope of the input: dither and noise only play while there's sound,
+                // so a silent track stays silent instead of hissing.
+                st.env = std::max (std::abs (dry), st.env * 0.9995f);
+                const bool live = st.env > 1.0e-4f;
                 if (set.dcFilter) s = st.dc.process (s);
                 if (set.antiAlias && hold > 1.01f) s = st.aa.process (s);
 
@@ -89,11 +93,11 @@ public:
                 if (st.phase >= st.nextHold)
                 {
                     st.phase -= st.nextHold;
-                    st.held = quantise (s, q, dith);
+                    st.held = live ? quantise (s, q, dith) : 0.0f; // silence stays exactly zero (Trunc would sit a step below)
                     st.nextHold = std::max (1.0f, hold * (1.0f + (uni (rng) - 0.5f) * set.jitter * 1.6f));
                 }
 
-                float y = st.held + (uni (rng) - 0.5f) * set.noise * 0.08f;
+                float y = st.held + (live ? (uni (rng) - 0.5f) * set.noise * 0.08f * std::min (1.0f, st.env * 4.0f) : 0.0f);
                 y = st.smooth.process (y);
                 y = st.lowCut.process (y);
                 y = st.highCut.process (y);
@@ -125,7 +129,7 @@ private:
     struct Channel
     {
         Biquad dc, aa, smooth, lowCut, highCut, tiltLo, tiltHi;
-        float phase = 0.0f, nextHold = 1.0f, held = 0.0f;
+        float phase = 0.0f, nextHold = 1.0f, held = 0.0f, env = 0.0f;
     };
 
     Settings set;

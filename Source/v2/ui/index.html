@@ -292,6 +292,18 @@ svg.g { width: 100%; height: auto; display: block; }
 #td .dk circle:nth-of-type(5) { fill: #e8231b; stroke: rgba(255,255,255,.5); stroke-width: .8; }
 #td .dk line { stroke: #fff; }
 
+/* ---------- per-effect power buttons + dimmed look when an effect is off ---------- */
+.rz-pwr, .tc-pwr { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 5px 13px 5px 9px; border-radius: 999px;
+  font: 700 clamp(11px, 1.3vw, 15px)/1 "Roboto Condensed", sans-serif; letter-spacing: .12em; color: #d6d0dc; background: rgba(10,8,14,.8); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.3); text-shadow: none; }
+.rz-pwr i, .tc-pwr i, #mx .gb-pwr i { font-style: normal; font-size: 1.15em; }
+#t2 .rz-pwr { margin-left: auto; }
+#t2 .rz-pwr[aria-pressed="true"] { color: #fff; background: linear-gradient(#ff8fc4, #e2338a); box-shadow: 0 0 14px rgba(255,79,163,.7); }
+#td .tc-pwr { font-family: "Lilita One", sans-serif; font-weight: 400; color: #fff; background: #12309a; box-shadow: inset 0 0 0 2px #0b1f5c; }
+#td .tc-pwr[aria-pressed="true"] { color: #12309a; background: #ffd400; box-shadow: 0 0 12px rgba(255,212,0,.7); }
+#mx .gb-hold .gb-pwr { display: inline-flex; align-items: center; gap: 4px; }
+#mx .gb-hold .gb-pwr[aria-pressed="true"] { background: #49ff6a; color: #021305; box-shadow: 0 0 10px rgba(73,255,106,.6); }
+#t2.fx-off .rz-mid, #t2.fx-off .rz-kb, #mx.fx-off .gb-graph, #hr.fx-off .gc-main, #hr.fx-off .gc-low, #td.fx-off .tc-scope, #td.fx-off .tc-low { filter: saturate(.3) brightness(.7); transition: filter .3s; }
+
 /* ---------- Bus: PS2 browser / system configuration style ---------- */
 #bus { background: radial-gradient(ellipse 80% 70% at 30% 40%, #1a2233, #0b0f18 60%, #05070b); overflow: hidden; color: #c8c8c8; font-family: "Helvetica Neue", Arial, sans-serif; }
 #bus .ps2fog { position: absolute; inset: 0; background: radial-gradient(ellipse 50% 40% at 20% 30%, rgba(120,150,210,.16), transparent 70%), radial-gradient(ellipse 60% 30% at 50% 100%, rgba(80,120,200,.12), transparent 70%); animation: fog 9s ease-in-out infinite alternate; }
@@ -637,7 +649,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
             <g font-family="Lilita One, Arial Black, sans-serif" font-size="60" stroke-linejoin="round" paint-order="stroke">
               <text x="8" y="58" fill="#1a0610" stroke="#1a0610" stroke-width="12" transform="translate(0 4)">Reggirizer</text>
               <text x="8" y="58" fill="url(#rzPink)" stroke="url(#rzChrome)" stroke-width="8">Reggirizer</text>
-              <text x="8" y="58" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.2">Reggirizer</text></g></svg><span class="rz-sub">vocal pitch correction</span></div>
+              <text x="8" y="58" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.2">Reggirizer</text></g></svg><span class="rz-sub">vocal pitch correction</span><button class="fxpwr rz-pwr" data-fx="t2" aria-pressed="false" aria-label="Reggirizer on/off"><i>⏻</i><b>OFF</b></button></div>
           <div class="rz-mid">
             <div class="rz-note"><b id="rzNote">E</b><label class="rz-keysel"><span class="sr">Key</span><select id="rzKey" aria-label="Key and scale"></select></label><em id="rzCents">+12 cents</em></div>
             <div class="rz-orb"><canvas id="rzTrace"></canvas></div>
@@ -661,7 +673,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
           <div class="gb-left">
             <div class="gb-hd" data-mode="time"><i class="gb-c"></i><span>time</span><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 5v5l3 2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
               <div class="gb-xy" id="gbXY"><i class="gb-xy-pill"></i></div></div>
-            <div class="gb-hold"><button class="gb-dd">&#9662;</button><button class="gb-holdb" aria-pressed="false">HOLD &#8631;</button></div>
+            <div class="gb-hold"><button class="gb-dd">&#9662;</button><button class="fxpwr gb-pwr" data-fx="mx" aria-pressed="false" aria-label="Blu Pill on/off"><i>⏻</i><b>OFF</b></button><button class="gb-holdb" aria-pressed="false">HOLD &#8631;</button></div>
             <div class="gb-grid" id="gbTime"></div>
             <div class="gb-grid" id="gbVol"></div>
             <div class="gb-env"><div class="gbk" data-k="att" data-v=".3" style="--v:.3"><i></i><span>ATT</span></div><div class="gbk" data-k="rel" data-v=".55" style="--v:.55"><i></i><span>REL</span></div><div class="gbk" data-k="tns" data-v=".5" style="--v:.5"><i></i><span>TNS</span></div></div>
@@ -842,9 +854,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
   }
   function gcx() {
     return `<div class="dmod"><i class="meter"><b style="height:62%"></b></i><div class="dm-body">
-      <div class="dm-head"><span class="dm-dd">GRAPECRUSHER · BITCRUSHER<span>▾</span></span><button class="dm-pwr" aria-label="Bypass">⏻</button></div>
+      <div class="dm-head"><span class="dm-dd">GRAPECRUSHER · BITCRUSHER<span>▾</span></span><button class="dm-pwr fxpwr off" data-fx="hr" aria-label="Grapecrusher on/off">⏻</button></div>
       <div class="gc-main">
-        <div class="gc-sec"><b>BIT DEPTH</b>${dk(.55, "bits", true)}<div class="pair">${dk(.25, "dither")}${dk(.1, "noise")}</div></div>
+        <div class="gc-sec"><b>BIT DEPTH</b>${dk(.55, "bits", true)}<div class="pair">${dk(0, "dither")}${dk(0, "noise")}</div></div>
         <div class="gc-scope"><b>CRUSH</b><svg id="gcScope" viewBox="0 0 200 110" preserveAspectRatio="none"></svg><div class="gc-modes" data-seg><button aria-pressed="true">ROUND</button><button>TRUNC</button><button>DITHER</button><button>MU-LAW</button></div></div>
         <div class="gc-sec"><b>SAMPLE RATE</b>${dk(.6, "rate", true)}<div class="pair">${dk(.2, "jitter")}${dk(.3, "smooth")}</div></div>
       </div>
@@ -889,7 +901,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
     api.gcPower = (on) => gpwr.classList.toggle("off", !on);
     gmodes.forEach((b, i) => b.addEventListener("click", () => { api.gcMode(i); BASED.emit("mode", "hr", i); }));
     gtogs.forEach((t, i) => t.addEventListener("click", () => { t.classList.toggle("on"); BASED.emit("toggle", "hr", i, t.classList.contains("on")); }));
-    gpwr.addEventListener("click", () => { gpwr.classList.toggle("off"); BASED.emit("power", "hr", !gpwr.classList.contains("off")); });
     const sc = $("#gcScope"), kv = (n) => +box.querySelector(`.dk[data-k="${n}"]`).dataset.v;
     let ph = 0;
     function draw() {
@@ -977,11 +988,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
     [[14, 20, 96, 26, 0], [50, 10, 56, 34, 1.4], [4, 56, 70, 30, 2.2], [40, 48, 120, 40, 0], [66, 72, 44, 22, 1], [20, 80, 54, 28, .6], [72, 30, 36, 18, 2.6], [56, 86, 28, 20, 3]].forEach(([x, y, s, d, b]) => {
       const c = document.createElement("div"); c.className = "pcube"; c.style.cssText = `left:${x}%;top:${y}%;--s:${s}px;--d:${d}s;filter:blur(${b}px);animation-delay:-${d * Math.random()}s`;
       c.innerHTML = "<i></i>".repeat(6); cubes.appendChild(c); });
-    const FX = [{ id: "t2", n: "Reggirizer", c: "#ff6fb1", l: "R", on: true }, { id: "mx", n: "Blu Pill", c: "#49ff6a", l: "B", on: true }, { id: "hr", n: "Grapecrusher", c: "#b56cff", l: "G", on: true }, { id: "td", n: "Trap City", c: "#ff9a2a", l: "T", on: true }];
+    const FX = [{ id: "t2", n: "Reggirizer", c: "#ff6fb1", l: "R", on: false }, { id: "mx", n: "Blu Pill", c: "#49ff6a", l: "B", on: false }, { id: "hr", n: "Grapecrusher", c: "#b56cff", l: "G", on: false }, { id: "td", n: "Trap City", c: "#ff9a2a", l: "T", on: false }];
     let sel = 0, dragFrom = -1;
     const list = $("#busList"), chain = $("#busChain");
     const move = (i, d) => { const j = i + d; if (j < 0 || j >= FX.length) return; [FX[i], FX[j]] = [FX[j], FX[i]]; sel = j; render(); staticBurst(1); };
     const toggle = (i) => { FX[i].on = !FX[i].on; render(); };
+    // Every effect screen has a power button (data-fx); it, the dimmed look and the bus list all follow FX.
+    const syncPower = () => FX.forEach((f) => {
+      document.getElementById(f.id)?.classList.toggle("fx-off", !f.on);
+      document.querySelectorAll(`.fxpwr[data-fx="${f.id}"]`).forEach((b) => { b.setAttribute("aria-pressed", String(f.on)); b.classList.toggle("off", !f.on); const l = b.querySelector("b"); if (l) l.textContent = f.on ? "ON" : "OFF"; });
+    });
+    api.syncPower = syncPower;
+    document.addEventListener("click", (e) => { const b = e.target.closest(".fxpwr"); if (!b) return; const i = FX.findIndex((f) => f.id === b.dataset.fx); if (i >= 0) { toggle(i); staticBurst(1); } });
     api.bus = (items) => { const byId = Object.fromEntries(FX.map((f) => [f.id, f])); const next = items.map((it) => byId[it.id]).filter(Boolean);
       if (next.length === FX.length) FX.splice(0, FX.length, ...next); items.forEach((it) => { if (byId[it.id]) byId[it.id].on = !!it.on; }); render(true); };
     api.busOn = (id, on) => { const f = FX.find((x) => x.id === id); if (f && f.on !== on) { f.on = on; render(true); } };
@@ -997,6 +1015,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
         r.addEventListener("dragover", (e) => { e.preventDefault(); r.classList.add("over"); });
         r.addEventListener("dragleave", () => r.classList.remove("over"));
         r.addEventListener("drop", (e) => { e.preventDefault(); if (dragFrom < 0 || dragFrom === i) return render(); const [f] = FX.splice(dragFrom, 1); FX.splice(i, 0, f); sel = i; dragFrom = -1; render(); staticBurst(1); }); });
+      syncPower();
       chain.querySelectorAll(".bnode").forEach((n, i) => n.addEventListener("pointerdown", (e) => {
         e.preventDefault(); n.setPointerCapture(e.pointerId);
         const x0 = e.clientX, nodes = [...chain.querySelectorAll(".bnode")], cx = nodes.map((o) => { const r = o.getBoundingClientRect(); return r.left + r.width / 2; });
@@ -1157,7 +1176,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
   // ---- Trap City: plate, live 808 scope, gunshots that leave holes in the wall ----
   (function () {
     const plate = $("#tcPlate");
-    plate.innerHTML = `<div class="tc-head"><b>TRAP CITY</b><span>DISTORTION</span><button class="tc-preset" id="tcPreset" aria-haspopup="dialog"><i>ACT 1</i>07 is lit!!!</button><button class="tc-blast" aria-label="Fire a gunshot">BLAST</button></div>
+    plate.innerHTML = `<div class="tc-head"><b>TRAP CITY</b><span>DISTORTION</span><button class="tc-preset" id="tcPreset" aria-haspopup="dialog"><i>ACT 1</i>07 is lit!!!</button><button class="fxpwr tc-pwr" data-fx="td" aria-pressed="false" aria-label="Trap City on/off"><i>\u23FB</i><b>OFF</b></button><button class="tc-blast" aria-label="Fire a gunshot">BLAST</button></div>
       <div class="tc-scope"><svg id="tcScope" viewBox="0 0 200 100" preserveAspectRatio="none"></svg><div class="tc-modes" data-seg><button>TAPE</button><button>TUBE</button><button aria-pressed="true">CLIP</button><button>FUZZ</button><button>BLOWN</button></div></div>
       <div class="tc-low">${dk(.65, "808")}${dk(.4, "grit")}${dk(.7, "drive", true)}${dk(.5, "tone")}${dk(.85, "mix")}${dk(.5, "out")}</div>`;
     const kv = (n) => +plate.querySelector(`.dk[data-k="${n}"]`).dataset.v, sc = $("#tcScope"); let ph = 0;
@@ -1443,6 +1462,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
     };
     f();
   });
+  api.syncPower();
 })();
 </script>
 <script type="module" src="bridge.js"></script>

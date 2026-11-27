@@ -23,8 +23,8 @@ namespace BasedParams
         { "bp_tns", "Blu Pill Tension", 0.0f, 1.0f, .5f },
         // Grapecrusher (hr)
         { "gc_bits",    "Grapecrusher Bits",      0.0f, 1.0f, .55f },
-        { "gc_dither",  "Grapecrusher Dither",    0.0f, 1.0f, .25f },
-        { "gc_noise",   "Grapecrusher Noise",     0.0f, 1.0f, .1f },
+        { "gc_dither",  "Grapecrusher Dither",    0.0f, 1.0f, 0.0f },
+        { "gc_noise",   "Grapecrusher Noise",     0.0f, 1.0f, 0.0f },
         { "gc_rate",    "Grapecrusher Rate",      0.0f, 1.0f, .6f },
         { "gc_jitter",  "Grapecrusher Jitter",    0.0f, 1.0f, .2f },
         { "gc_smooth",  "Grapecrusher Smooth",    0.0f, 1.0f, .3f },
@@ -54,8 +54,9 @@ namespace BasedParams
 
     struct Toggle { const char* id; const char* name; bool def; };
     inline const std::array<Toggle, 20> toggles {{
-        { "on_rz", "Reggirizer On", true }, { "on_bp", "Blu Pill On", true },
-        { "on_gc", "Grapecrusher On", true }, { "on_tc", "Trap City On", true },
+        // Every effect starts switched off: a fresh 07BASED passes audio through untouched.
+        { "on_rz", "Reggirizer On", false }, { "on_bp", "Blu Pill On", false },
+        { "on_gc", "Grapecrusher On", false }, { "on_tc", "Trap City On", false },
         { "gc_aa", "Grapecrusher Anti Alias", true }, { "gc_dc", "Grapecrusher DC Filter", false },
         { "gc_soft", "Grapecrusher Soft Clip Out", true }, { "bp_hold", "Blu Pill Hold", false },
         // Reggirizer keyboard: which notes it tunes to (default E minor)
