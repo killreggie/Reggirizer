@@ -1,6 +1,6 @@
 @echo off
 rem Builds the Reggirizer VST3 for Windows (64-bit) and installs it for FL Studio.
-rem Needs: Visual Studio 2022 (free Community edition) with "Desktop development with C++".
+rem Needs: Visual Studio 2022 or newer (free Community edition) with "Desktop development with C++".
 rem Double-click this file, or run it from a Developer Command Prompt.
 
 setlocal
@@ -14,7 +14,7 @@ if errorlevel 1 (
 )
 where cmake >nul 2>nul
 if errorlevel 1 (
-    echo Could not find CMake. Install Visual Studio 2022 Community with "Desktop development with C++".
+    echo Could not find CMake. Install Visual Studio Community with "Desktop development with C++".
     pause
     exit /b 1
 )
@@ -26,7 +26,8 @@ if not exist JUCE\CMakeLists.txt (
 )
 
 echo === Configuring ===
-cmake -S . -B build-win -G "Visual Studio 17 2022" -A x64 || goto :fail
+rem No -G: CMake uses the newest Visual Studio installed (2022, 2026, ...).
+cmake -S . -B build-win -A x64 || goto :fail
 
 echo === Building (this takes a few minutes the first time) ===
 cmake --build build-win --config Release --target Reggirizer_VST3 || goto :fail

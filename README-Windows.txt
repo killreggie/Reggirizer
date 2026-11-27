@@ -1,7 +1,7 @@
 REGGIRIZER - building and installing on Windows for FL Studio
 =============================================================
 
-1. Install Visual Studio 2022 Community (free):
+1. Install Visual Studio Community (free, 2022 or newer):
    https://visualstudio.microsoft.com/vs/community/
    In the installer, tick "Desktop development with C++" and install.
 
