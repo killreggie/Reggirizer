@@ -8,7 +8,8 @@
 // running in the system web view, wired to the parameters through JUCE's
 // web relays. The UI's own controls stay the source of truth for how it looks;
 // the relays just keep them and the host in sync both ways.
-class BasedEditor : public juce::AudioProcessorEditor, private juce::Timer
+class BasedEditor : public juce::AudioProcessorEditor, private juce::Timer,
+                    private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     explicit BasedEditor (BasedProcessor&);
@@ -21,6 +22,8 @@ public:
 
 private:
     void timerCallback() override;
+    void parameterChanged (const juce::String& id, float value) override; // logs effects switching on/off
+    static void log (const juce::String& line);
     std::optional<juce::WebBrowserComponent::Resource> getResource (const juce::String& url);
 
     BasedProcessor& proc;

@@ -505,6 +505,8 @@ svg.g { width: 100%; height: auto; display: block; }
 #hr .spk .cone { position: absolute; left: 50%; top: 50%; width: 92%; aspect-ratio: 1 / 1.45; transform: translate(-50%, -50%); border-radius: 50%; mix-blend-mode: multiply; animation: thump .46s ease-in-out infinite alternate;
   background: radial-gradient(ellipse, #f4eaff 0 8%, #9a6bc6 10%, #3c1460 13%, #a777d3 22%, #59268a 34%, #c79ef0 46%, #4b1b75 58%, #2a0a45 64%, #e2c7ff 67%, #6a2fa0 72%, #c8a6ea 76%, rgba(255,255,255,0) 80%); }
 @keyframes thump { to { transform: translate(-50%, -50%) scale(1.035); } }
+#hr .spk.live .cone { animation: none; transform: translate(-50%, -50%) scale(calc(1 + var(--pump, 0) * .1)); transition: transform .05s linear; }
+#hr .spk.live .cap { transform: translate(-50%, -50%) scale(calc(1 + var(--pump, 0) * .22)); transition: transform .05s linear; }
 #hr .spk .cap { position: absolute; left: 50%; top: 50%; width: 22%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%;
   background: radial-gradient(circle at 38% 32%, #ffffff, #d7dbe1 30%, #8e949d 70%, #5c6168); box-shadow: 0 2px 5px rgba(0,0,0,.6), 0 0 0 2px rgba(40,10,60,.7); opacity: .9; }
 #hr .spk .grille::after { content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -769,7 +771,16 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
   </div></div>
 </div>
 
-<script>window.BASED = { plugin: !!window.__JUCE__, emit() {}, api: {} };</script>
+<script>
+window.BASED = { plugin: !!window.__JUCE__, emit() {}, api: {} };
+// If the bridge to the audio engine fails to load, say so on screen and in the log instead of failing silently.
+if (window.__JUCE__) {
+  const log = (m) => { try { window.__JUCE__.backend.emitEvent("__juce__invoke", { name: "uiLog", params: [m], resultId: -1 }); } catch (e) {} };
+  window.addEventListener("error", (e) => log("error: " + e.message + " (" + String(e.filename || "").split("/").pop() + ":" + e.lineno + ")"));
+  setTimeout(() => { if (!window.BASED.bridged) { log("bridge.js did not load: controls are not connected");
+    document.body.insertAdjacentHTML("beforeend", '<div style="position:fixed;left:8px;bottom:8px;z-index:999;font:13px system-ui;color:#fff;background:#b00020;padding:5px 9px;border-radius:5px">Controls not connected to the audio engine - please report this</div>'); } }, 4000);
+}
+</script>
 <script>
 (function () {
   const $ = (s, r = document) => r.querySelector(s);
@@ -777,6 +788,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
   // BASED.plugin and BASED.emit (UI -> audio engine) and calls BASED.api.* (audio engine -> UI).
   const BASED = window.BASED || (window.BASED = { plugin: false, emit() {} });
   const api = BASED.api = BASED.api || {};
+  // Live audio from the engine (plugin only): api.live = { lv: [L, R], gcIn, gcOut, tcIn, tcOut } (scopes: 128 samples, -1..1).
+  const peakOf = (a) => (a ? a.reduce((m, v) => Math.max(m, Math.abs(v)), 0) : 0);
+  const scopePath = (a, w, mid, amp, gain) => a.map((v, i) => `${i ? "L" : "M"}${(i / (a.length - 1) * w).toFixed(1)} ${(mid - Math.max(-1.15, Math.min(1.15, v * gain)) * amp).toFixed(1)}`).join("");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const knob = (v, l, val, col) => { const R = 26, c = 2 * Math.PI * R, a = c * .75;
     return `<div class="kn"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="${R}" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="4" stroke-dasharray="${a} ${c}" transform="rotate(135 32 32)"/>
@@ -912,11 +926,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
       for (let i = 1; i < 8; i++) grid += `<line x1="${i * 25}" y1="0" x2="${i * 25}" y2="110" stroke="#4a1f6b"/>`;
       for (let i = 1; i < 4; i++) grid += `<line x1="0" y1="${i * 27.5}" x2="200" y2="${i * 27.5}" stroke="#4a1f6b"/>`;
       const src = (i) => Math.sin(i / 200 * Math.PI * 4 + ph) * .85, N = 200;
-      const clean = Array.from({ length: N + 1 }, (_, i) => `${i ? "L" : "M"}${i} ${55 - src(i) * 46}`).join("");
+      let clean = Array.from({ length: N + 1 }, (_, i) => `${i ? "L" : "M"}${i} ${55 - src(i) * 46}`).join("");
       let d = "", held = 0, next = 0;
       for (let i = 0; i <= N; i++) {
         if (i >= next) { const y0 = 55 - held * 46; held = quant(src(i)) + (Math.random() - .5) * nz * .3; next = i + Math.max(1, Math.round(hold * (1 + (Math.random() - .5) * jit * 1.6))); if (i) d += ` L${i} ${y0}`; }
         d += `${i ? " L" : "M"}${i} ${55 - held * 46}`; }
+      const L = api.live;
+      if (L && L.gcOut) { const gain = 0.9 / Math.max(0.05, peakOf(L.gcIn), peakOf(L.gcOut)); clean = scopePath(L.gcIn, 200, 55, 46, gain); d = scopePath(L.gcOut, 200, 55, 46, gain); }
       sc.innerHTML = `${grid}<line x1="0" y1="55" x2="200" y2="55" stroke="#5a2a80"/><path d="${clean}" fill="none" stroke="rgba(236,216,255,.35)" stroke-width="1.2" stroke-dasharray="2 2"/><path d="${d}" fill="none" stroke="#f0d6ff" stroke-width="2" style="filter:drop-shadow(0 0 4px #c77dff)"/>
         <text x="196" y="12" text-anchor="end" font-size="9" fill="#e6c8ff" font-family="system-ui">${bits} BIT · ${Math.round(44100 / hold)} HZ</text>`;
     }
@@ -1189,9 +1205,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
     function draw() {
       const m = plate.querySelector(".tc-modes [aria-pressed=true]").textContent, d = kv("drive"), lo = .5 + kv("808") * .5, gr = kv("grit");
       let g = ""; for (let i = 1; i < 10; i++) g += `<line x1="${i * 20}" y1="0" x2="${i * 20}" y2="100" stroke="#14286e"/>`; for (let i = 1; i < 4; i++) g += `<line x1="0" y1="${i * 25}" x2="200" y2="${i * 25}" stroke="#14286e"/>`;
-      const p = Array.from({ length: 201 }, (_, i) => { const x = Math.sin(i / 200 * Math.PI * 3 + ph) * lo * Math.exp(-((i + ph * 20) % 200) / 260) + (Math.random() - .5) * gr * .15;
+      let p = Array.from({ length: 201 }, (_, i) => { const x = Math.sin(i / 200 * Math.PI * 3 + ph) * lo * Math.exp(-((i + ph * 20) % 200) / 260) + (Math.random() - .5) * gr * .15;
         return `${i ? "L" : "M"}${i} ${50 - shape(x, m, d) * 42}`; }).join("");
-      sc.innerHTML = `${g}<line x1="0" y1="50" x2="200" y2="50" stroke="#1d3a9a"/><path d="${p}" fill="none" stroke="#ffd400" stroke-width="2.2" style="filter:drop-shadow(0 0 4px #ffe766)"/>
+      let pin = "";
+      const L = api.live;
+      if (L && L.tcOut) { const gain = 0.9 / Math.max(0.05, peakOf(L.tcIn), peakOf(L.tcOut)); p = scopePath(L.tcOut, 200, 50, 42, gain); pin = scopePath(L.tcIn, 200, 50, 42, gain); }
+      sc.innerHTML = `${g}<line x1="0" y1="50" x2="200" y2="50" stroke="#1d3a9a"/>${pin ? `<path d="${pin}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.2" stroke-dasharray="2 2"/>` : ""}<path d="${p}" fill="none" stroke="#ffd400" stroke-width="2.2" style="filter:drop-shadow(0 0 4px #ffe766)"/>
         <text x="196" y="12" text-anchor="end" font-size="10" fill="#ffffff" font-family="Lilita One, sans-serif">${m} · DRIVE ${Math.round(d * 100)}</text>`;
     }
     const tmodes = [...plate.querySelectorAll(".tc-modes button")];
@@ -1368,6 +1387,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
     stab.forEach((b, i) => b.addEventListener("click", () => { setStab(i); BASED.emit("stab", i); }));
     apply(4, "Minor", true);
     let live = null; // real pitch from the engine (plugin only)
+    const histIn = [], histOut = [];
     api.rz = {
       set: (notes, r, scIdx, stabIdx) => { root = r; scale = SCALES[scIdx] || "Note"; kb.querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-pressed", String(!!notes[i])));
         keySel.value = `${r}|${scale === "Major" ? "Major" : "Minor"}`; setSeg(scale); setStab(stabIdx); },
@@ -1383,6 +1403,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
         let tgt = on.length ? on.reduce((b, n) => Math.abs(n - sung) < Math.abs(b - sung) ? n : b, on[0]) : sung;
         if (live) { if (live.det < 0) { sung = -1; tgt = live.tgt >= 0 ? live.tgt % 12 : -1; } else { sung = Math.round(live.det) % 12; tgt = live.tgt >= 0 ? live.tgt % 12 : sung; } }
         g.clearRect(0, 0, W, H);
+        if (live) {
+          const raw = live.det >= 0 && live.tgt >= 0 ? (live.det - live.tgt) * 100 : null;
+          histIn.push(raw); histOut.push(raw == null ? null : raw + (live.corr || 0));
+          while (histIn.length > 60) { histIn.shift(); histOut.shift(); }
+          g.strokeStyle = "rgba(255,111,177,.5)"; g.lineWidth = 1; g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
+          [[histIn, "rgba(232,50,60,.95)"], [histOut, "rgba(63,183,201,.95)"]].forEach(([h, col]) => { g.strokeStyle = col; g.lineWidth = 2.5; g.beginPath();
+            h.forEach((c, i) => { const x = (i / 59) * W, y = H / 2 - (c == null ? 0 : Math.max(-100, Math.min(100, c)) / 100) * H * 0.38; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); });
+        } else
         for (let k = 0; k < 3; k++) { g.strokeStyle = ["rgba(232,50,60,.9)", "rgba(255,111,177,.7)", "rgba(63,183,201,.8)"][k]; g.lineWidth = 2.5; g.beginPath();
           const amt = k === 2 ? .12 + hum() * .9 : 1;
           for (let x = 0; x <= W; x += 4) { const y = H / 2 + Math.sin(x / (18 + k * 6) + t * (1.5 + k * .4)) * H * (.12 - k * .03) * Math.sin(t * .7 + k) * amt + (k === 2 ? Math.sin(x / 7 + t * 4) * H * .02 * hum() : 0); x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
@@ -1446,7 +1474,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
     };
   })();
 
-  setInterval(() => { document.querySelectorAll(".dmod .meter b").forEach((b) => (b.style.height = `${30 + Math.random() * 60}%`)); }, 120);
+  const lvH = (pk) => `${Math.max(0, Math.min(100, ((20 * Math.log10(Math.max(pk, 1e-6)) + 54) / 54) * 100))}%`;
+  setInterval(() => {
+    const L = api.live;
+    document.querySelectorAll(".dmod").forEach((m) => { const [a, b] = m.querySelectorAll(".meter b"); if (!a || !b) return;
+      if (L && L.gcIn) { a.style.height = lvH(peakOf(L.gcIn)); b.style.height = lvH(peakOf(L.gcOut)); }
+      else if (!BASED.plugin) { a.style.height = `${30 + Math.random() * 60}%`; b.style.height = `${30 + Math.random() * 60}%`; } });
+  }, 100);
+  // Grapecrusher's speakers pump with the plugin's real output (left speaker = left channel).
+  { let pl = 0, pr = 0; const to = (pk) => Math.max(0, Math.min(1, (20 * Math.log10(Math.max(pk, 1e-6)) + 42) / 42));
+    setInterval(() => { if (!BASED.plugin || cur !== "hr") return; const lv = (api.live && api.live.lv) || [0, 0];
+      const tl = to(lv[0]), tr = to(lv[1]); pl = tl > pl ? tl : pl * 0.8; pr = tr > pr ? tr : pr * 0.8;
+      document.querySelectorAll("#hr .spk").forEach((sp, i) => { sp.classList.add("live"); sp.style.setProperty("--pump", (i ? pr : pl).toFixed(3)); }); }, 33); }
 
   // ---- code rain on the hallway walls (Blu Pill) ----
   document.querySelectorAll("#mx .hall canvas").forEach((cv) => {

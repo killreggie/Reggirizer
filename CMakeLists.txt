@@ -97,10 +97,11 @@ juce_add_binary_data(BasedUIData
         Source/v2/ui/fonts/RobotoCondensed.ttf
         Source/v2/ui/studio.jpg
         Source/v2/ui/blue_metal_plate.jpg
-        Source/v2/ui/rusty_metal_04.jpg)
+        Source/v2/ui/rusty_metal_04.jpg
+        Source/v2/ui/metal_plate.jpg)
 
 juce_add_plugin(SevenBased
-    VERSION 2.0.1
+    VERSION 2.0.2
     COMPANY_NAME "Reggie Audio"
     BUNDLE_ID "com.reggieaudio.07based"
     PLUGIN_MANUFACTURER_CODE Regg
@@ -161,6 +162,7 @@ if(BASED_BUILD_TESTS)
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0)
     target_link_libraries(BasedTest PRIVATE
+        BasedUIData
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_recommended_config_flags)

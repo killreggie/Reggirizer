@@ -56,6 +56,30 @@ public:
     void blast() { pendingShots.fetch_add (1); }
 
     // ---- live readouts for the UI (any thread) ----
+    // A small mono history of the signal at one point in the chain, for the scopes.
+    struct Scope
+    {
+        static constexpr int size = 4096;
+        std::array<float, size> buf {};
+        std::atomic<int> pos { 0 };
+        void push (float* const* d, int numCh, int n)
+        {
+            int p = pos.load (std::memory_order_relaxed);
+            for (int i = 0; i < n; ++i, p = (p + 1) & (size - 1))
+                buf[(size_t) p] = numCh > 1 ? 0.5f * (d[0][i] + d[1][i]) : d[0][i];
+            pos.store (p, std::memory_order_release);
+        }
+        // The most recent count*step samples, every step-th one (oldest first).
+        void read (float* out, int count, int step) const
+        {
+            const int p = pos.load (std::memory_order_acquire);
+            for (int k = 0; k < count; ++k)
+                out[k] = buf[(size_t) ((p - (count - k) * step) & (size - 1))];
+        }
+    };
+    Scope gcIn, gcOut, tcIn, tcOut;
+    std::array<std::atomic<float>, 2> outPeak {}; // max |sample| since the UI last read it
+
     PitchEngine pitch;
     std::atomic<float> barPhase { -1.0f }; // -1 when Blu Pill isn't running
 

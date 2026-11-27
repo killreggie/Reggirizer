@@ -8,6 +8,7 @@ import * as Juce from "./juce/index.js";
 const B = window.BASED, api = B.api;
 if (window.__JUCE__) {
   B.plugin = true;
+  B.bridged = true; // index.html shows a warning if this never gets set
 
   const prefix = { t2: "rz_", mx: "bp_", hr: "gc_", td: "tc_" };
   const paramOf = (uiId) => { const [sec, k] = uiId.split(":"); return prefix[sec] + k.replace(/\s+/g, ""); };
@@ -16,6 +17,9 @@ if (window.__JUCE__) {
   const toggle = (id) => cache[id] || (cache[id] = Juce.getToggleState(id));
   const combo = (id) => cache[id] || (cache[id] = Juce.getComboBoxState(id));
   const call = (name, ...args) => Juce.getNativeFunction(name)(...args);
+  call("uiLog", "UI connected to the audio engine");
+  window.addEventListener("error", (e) => call("uiLog", `error: ${e.message} (${(e.filename || "").split("/").pop()}:${e.lineno})`));
+  window.addEventListener("unhandledrejection", (e) => call("uiLog", `error: ${e.reason}`));
 
   const gcToggles = ["gc_aa", "gc_dc", "gc_soft"];
   const fxOn = { t2: "on_rz", mx: "on_bp", hr: "on_gc", td: "on_tc" };
@@ -96,7 +100,8 @@ if (window.__JUCE__) {
 
   // Live readouts from the audio engine (~30 per second).
   window.__JUCE__.backend.addEventListener("status", (s) => {
-    api.rz.pitch({ det: s.det, tgt: s.tgt, cents: s.cents });
+    api.live = s;
+    api.rz.pitch({ det: s.det, tgt: s.tgt, cents: s.cents, corr: s.corr });
     api.bp.phase = s.phase >= 0 ? s.phase : null;
   });
 }

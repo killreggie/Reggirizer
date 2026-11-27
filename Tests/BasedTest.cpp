@@ -2,6 +2,7 @@
 // Exits non-zero if anything fails.
 
 #include "../Source/v2/BasedProcessor.h"
+#include "../Source/v2/BasedUIFiles.h"
 #include <juce_events/juce_events.h>
 #include <cstdio>
 
@@ -237,9 +238,51 @@ static void testProcessor()
     check (other.getBluEdits().contains ("\"16\""), "edited Blu Pill slots survive saving and loading");
 }
 
+// Every file the UI page asks for must be served from the plugin, using the
+// request format JUCE really uses (a path like "/fonts/x.ttf").
+static void testUiFiles()
+{
+    check (BasedUIFiles::fileFor ("/") == "index.html", "web view root serves index.html");
+    check (BasedUIFiles::fileFor ("/fonts/LilitaOne.ttf") == "LilitaOne.ttf", "path-style request maps to the file name");
+    check (BasedUIFiles::fileFor ("juce://juce.backend/bridge.js?x=1") == "bridge.js", "full-URL request maps to the file name");
+
+    int size = 0;
+    const char* html = BasedUIFiles::find ("index.html", size);
+    check (html != nullptr && size > 1000, "index.html is bundled");
+    if (html == nullptr) return;
+    const juce::String page (juce::CharPointer_UTF8 (html), (size_t) size);
+    const char* js = BasedUIFiles::find ("bridge.js", size);
+    const juce::String bridge = js ? juce::String (juce::CharPointer_UTF8 (js), (size_t) size) : juce::String();
+
+    // Collect url(...), src="..." and import "..." references that point at local files.
+    juce::StringArray refs { "/juce/index.js", "/juce/check_native_interop.js" };
+    auto scan = [&refs] (const juce::String& text, const juce::String& open, juce::juce_wchar close)
+    {
+        for (int i = text.indexOf (open); i >= 0; i = text.indexOf (i + 1, open))
+        {
+            auto ref = text.substring (i + open.length()).upToFirstOccurrenceOf (juce::String::charToString (close), false, false).trimCharactersAtStart ("\"'").trimCharactersAtEnd ("\"'");
+            if (ref.isNotEmpty() && ! ref.startsWith ("#") && ! ref.startsWith ("data:") && ! ref.contains ("://") && ! ref.contains ("$") && ref.containsChar ('.'))
+                refs.addIfNotAlreadyThere ("/" + (ref.startsWith ("./") ? ref.substring (2) : ref));
+        }
+    };
+    scan (page, "url(", ')');
+    scan (page, "src=\"", '"');
+    scan (bridge, "from \"", '"');
+    bool all = true;
+    for (auto& r : refs)
+        if (BasedUIFiles::find (BasedUIFiles::fileFor (r), size) == nullptr)
+        {
+            std::printf ("      missing from the plugin: %s\n", r.toRawUTF8());
+            all = false;
+        }
+    std::printf ("      %d local files referenced by the UI\n", refs.size());
+    check (all && refs.size() >= 12, "every file the UI loads (fonts, images, bridge, JUCE glue) is bundled and found");
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI init;
+    testUiFiles();
     testPresets();
     testGrapeCrusher();
     testTrapCity();

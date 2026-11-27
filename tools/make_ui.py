@@ -48,12 +48,23 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0b0a; -we
 .room::after { display: none; }
 """
 sub(r"</style>", plugin_css + "</style>")
-sub(r"<script>\n\(function \(\) \{", '<script>window.BASED = { plugin: !!window.__JUCE__, emit() {}, api: {} };</script>\n<script>\n(function () {')
+watchdog = """<script>
+window.BASED = { plugin: !!window.__JUCE__, emit() {}, api: {} };
+// If the bridge to the audio engine fails to load, say so on screen and in the log instead of failing silently.
+if (window.__JUCE__) {
+  const log = (m) => { try { window.__JUCE__.backend.emitEvent("__juce__invoke", { name: "uiLog", params: [m], resultId: -1 }); } catch (e) {} };
+  window.addEventListener("error", (e) => log("error: " + e.message + " (" + String(e.filename || "").split("/").pop() + ":" + e.lineno + ")"));
+  setTimeout(() => { if (!window.BASED.bridged) { log("bridge.js did not load: controls are not connected");
+    document.body.insertAdjacentHTML("beforeend", '<div style="position:fixed;left:8px;bottom:8px;z-index:999;font:13px system-ui;color:#fff;background:#b00020;padding:5px 9px;border-radius:5px">Controls not connected to the audio engine - please report this</div>'); } }, 4000);
+}
+</script>
+"""
+sub(r"<script>\n\(function \(\) \{", lambda m: watchdog + "<script>\n(function () {")
 s = s.rstrip()
 assert s.endswith("</html>") or s.endswith("</script>"), "make_ui: unexpected file end"
 s = re.sub(r"(</script>)(?![\s\S]*</script>)", r'\1\n<script type="module" src="bridge.js"></script>', s, count=1)
 
 (ui / "index.html").write_text(s, encoding="utf-8")
-for img in ["studio.jpg", "blue_metal_plate.jpg", "rusty_metal_04.jpg"]:
+for img in ["studio.jpg", "blue_metal_plate.jpg", "rusty_metal_04.jpg", "metal_plate.jpg"]:
     shutil.copy(root / "planning" / "dvd" / img, ui / img)
 print("wrote", ui / "index.html")

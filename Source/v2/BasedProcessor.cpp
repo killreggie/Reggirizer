@@ -224,8 +224,16 @@ void BasedProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
                     break;
                 }
                 case 1: blu.process (ptr, numCh, n, phaseBuf.data(), barSamples, bluActive); break;
-                case 2: if (on ("on_gc")) crusher.process (ptr, numCh, n); break;
-                case 3: trap.process (ptr, numCh, n, on ("on_tc")); break;
+                case 2:
+                    gcIn.push (ptr, numCh, n);
+                    if (on ("on_gc")) crusher.process (ptr, numCh, n);
+                    gcOut.push (ptr, numCh, n);
+                    break;
+                case 3:
+                    tcIn.push (ptr, numCh, n);
+                    trap.process (ptr, numCh, n, on ("on_tc"));
+                    tcOut.push (ptr, numCh, n);
+                    break;
             }
         }
 
@@ -242,14 +250,22 @@ void BasedProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     else
         barPhase.store (-1.0f);
 
-    // Never hand the host a broken sample.
+    // Never hand the host a broken sample; note the output peak for the speakers.
     for (int c = 0; c < numCh; ++c)
     {
         auto* d = buffer.getWritePointer (c);
+        float peak = 0.0f;
         for (int i = 0; i < total; ++i)
+        {
             if (! std::isfinite (d[i]))
                 d[i] = 0.0f;
+            peak = std::max (peak, std::abs (d[i]));
+        }
+        if (peak > outPeak[(size_t) c].load (std::memory_order_relaxed))
+            outPeak[(size_t) c].store (peak, std::memory_order_relaxed);
     }
+    if (numCh == 1)
+        outPeak[1].store (outPeak[0].load (std::memory_order_relaxed), std::memory_order_relaxed);
 }
 
 // ---------------------------------------------------------------- UI-owned state

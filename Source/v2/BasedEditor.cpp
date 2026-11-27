@@ -1,23 +1,6 @@
 #include "BasedEditor.h"
 #include "BasedParams.h"
-#include "BasedUIData.h"
-
-namespace
-{
-    const char* mimeFor (const juce::String& file)
-    {
-        const auto ext = file.fromLastOccurrenceOf (".", false, false).toLowerCase();
-        if (ext == "html") return "text/html; charset=utf-8";
-        if (ext == "js")   return "text/javascript; charset=utf-8";
-        if (ext == "css")  return "text/css; charset=utf-8";
-        if (ext == "png")  return "image/png";
-        if (ext == "jpg" || ext == "jpeg") return "image/jpeg";
-        if (ext == "svg")  return "image/svg+xml";
-        if (ext == "ttf")  return "font/ttf";
-        if (ext == "json") return "application/json";
-        return "application/octet-stream";
-    }
-}
+#include "BasedUIFiles.h"
 
 BasedEditor::BasedEditor (BasedProcessor& p) : AudioProcessorEditor (p), proc (p)
 {
@@ -56,6 +39,9 @@ BasedEditor::BasedEditor (BasedProcessor& p) : AudioProcessorEditor (p), proc (p
         .withNativeFunction ("saveBluEdits", [this] (const Array<var>& args, auto done) { proc.setBluEdits (args[0].toString()); done ({}); })
         .withNativeFunction ("setTcPreset", [this] (const Array<var>& args, auto done) { proc.setTcPreset ((int) args[0], (int) args[1]); done ({}); })
         .withNativeFunction ("blast", [this] (const Array<var>&, auto done) { proc.blast(); done ({}); })
+        // The UI reports that it connected (and any script error) to a small log file,
+        // so a broken UI can be diagnosed: ~/Library/Logs/07BASED.log or %APPDATA%\07BASED\07BASED.log
+        .withNativeFunction ("uiLog", [] (const Array<var>& args, auto done) { log (args[0].toString()); done ({}); })
         .withNativeFunction ("getState", [this] (const Array<var>&, auto done)
         {
             auto* o = new DynamicObject();
@@ -92,11 +78,35 @@ BasedEditor::BasedEditor (BasedProcessor& p) : AudioProcessorEditor (p), proc (p
     }
     setSize (baseWidth, baseHeight);
     startTimerHz (30);
+    for (auto* id : BasedParams::fxOnIds)
+        proc.apvts.addParameterListener (id, this);
 }
 
 BasedEditor::~BasedEditor()
 {
+    for (auto* id : BasedParams::fxOnIds)
+        proc.apvts.removeParameterListener (id, this);
     stopTimer();
+}
+
+void BasedEditor::parameterChanged (const juce::String& id, float value)
+{
+    log (id + (value > 0.5f ? " on" : " off"));
+}
+
+// A small diagnostics log: ~/Library/Logs/07BASED.log (Mac) or %APPDATA%\07BASED\07BASED.log (Windows).
+void BasedEditor::log (const juce::String& line)
+{
+    using namespace juce;
+   #if JUCE_MAC
+    auto f = File::getSpecialLocation (File::userHomeDirectory).getChildFile ("Library/Logs/07BASED.log");
+   #else
+    auto f = File::getSpecialLocation (File::userApplicationDataDirectory).getChildFile ("07BASED/07BASED.log");
+   #endif
+    f.getParentDirectory().createDirectory();
+    if (f.getSize() > 200000)
+        f.deleteFile();
+    f.appendText (Time::getCurrentTime().toString (true, true) + "  " + line + "\n");
 }
 
 void BasedEditor::resized()
@@ -115,30 +125,42 @@ void BasedEditor::timerCallback()
     o->setProperty ("tgt", tgt);
     o->setProperty ("cents", det >= 0.0f && tgt >= 0 ? (det - (float) tgt) * 100.0f : 0.0f);
     o->setProperty ("phase", proc.barPhase.load());
+    o->setProperty ("corr", proc.pitch.correctionCents.load());
+
+    // Output level (for Grapecrusher's speakers) and the scopes: ~21 ms of signal, 128 points.
+    juce::Array<juce::var> lv;
+    for (auto& pk : proc.outPeak)
+        lv.add (pk.exchange (0.0f));
+    o->setProperty ("lv", lv);
+    auto scope = [] (const BasedProcessor::Scope& sc)
+    {
+        float tmp[128];
+        sc.read (tmp, 128, 8);
+        juce::Array<juce::var> a;
+        a.ensureStorageAllocated (128);
+        for (float f : tmp)
+            a.add (std::round (f * 1000.0f) / 1000.0f);
+        return juce::var (a);
+    };
+    o->setProperty ("gcIn", scope (proc.gcIn));
+    o->setProperty ("gcOut", scope (proc.gcOut));
+    o->setProperty ("tcIn", scope (proc.tcIn));
+    o->setProperty ("tcOut", scope (proc.tcOut));
     web->emitEventIfBrowserIsVisible ("status", juce::var (o));
 }
 
-// Serves the bundled UI. Every file is looked up by its file name.
+// Serves the bundled UI (see BasedUIFiles for how requests map to files).
 std::optional<juce::WebBrowserComponent::Resource> BasedEditor::getResource (const juce::String& url)
 {
-    auto path = url.fromFirstOccurrenceOf (juce::WebBrowserComponent::getResourceProviderRoot(), false, false);
-    path = path.upToFirstOccurrenceOf ("?", false, false).upToFirstOccurrenceOf ("#", false, false);
-    if (path.isEmpty() || path == "/")
-        path = "index.html";
-    const auto file = path.fromLastOccurrenceOf ("/", false, false);
-
-    for (int i = 0; i < BasedUIData::namedResourceListSize; ++i)
-        if (file == BasedUIData::originalFilenames[i])
-        {
-            int size = 0;
-            if (const auto* data = BasedUIData::getNamedResource (BasedUIData::namedResourceList[i], size))
-            {
-                juce::WebBrowserComponent::Resource r;
-                r.data.resize ((size_t) size);
-                std::memcpy (r.data.data(), data, (size_t) size);
-                r.mimeType = mimeFor (file);
-                return r;
-            }
-        }
+    const auto file = BasedUIFiles::fileFor (url);
+    int size = 0;
+    if (const auto* data = BasedUIFiles::find (file, size))
+    {
+        juce::WebBrowserComponent::Resource r;
+        r.data.resize ((size_t) size);
+        std::memcpy (r.data.data(), data, (size_t) size);
+        r.mimeType = BasedUIFiles::mimeFor (file);
+        return r;
+    }
     return std::nullopt;
 }
