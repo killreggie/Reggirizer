@@ -1,0 +1,29 @@
+REGGIRIZER - INSTALL
+====================
+
+WINDOWS (FL Studio, Ableton, Reaper, ...)
+  1. Unzip Reggirizer-Windows-VST3.zip.
+  2. Copy the "Reggirizer.vst3" folder into:
+       C:\Program Files\Common Files\VST3
+     (Windows will ask for admin permission - click Continue.)
+  3. FL Studio: Options > Manage plugins > Find plugins.
+     Then click an empty insert slot on a mixer track and choose Reggirizer.
+
+MAC
+  1. Unzip Reggirizer-macOS-VST3.zip (or the AU zip for Logic / GarageBand).
+  2. Copy the plugin into:
+       VST3: ~/Library/Audio/Plug-Ins/VST3
+       AU:   ~/Library/Audio/Plug-Ins/Components
+     (In Finder press Cmd+Shift+G and paste the path.)
+  3. The plugin isn't signed by Apple, so macOS may block it. If your DAW
+     doesn't show it, open Terminal and run:
+       xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/Reggirizer.vst3
+       xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/Reggirizer.component
+  4. Rescan plugins in your DAW.
+
+WHAT'S INSIDE
+  TUNING page: pitch correction with Jewish prayer modes (Ahava Rabbah,
+  Mi Sheberach, Magen Avot, Adonai Malach) plus major/minor/chromatic,
+  retune speed down to -3 ms, note stabilizer, sustain, doubler, reference
+  tone, instance groups, and a dreidel that spins up a random tune.
+  REGGURRECTION page: multi-voice stereo flanger with presets.

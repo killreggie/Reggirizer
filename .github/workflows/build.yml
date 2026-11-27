@@ -1,0 +1,90 @@
+# Builds Reggirizer for Windows (VST3) and macOS (VST3 + AU) on GitHub's servers.
+# - Every push to main: builds, and the zips appear under the run's "Artifacts".
+# - Pushing a version tag (reggirizer-v1, reggirizer-v2, ...): also publishes a
+#   Release titled "Reggirizer v1", "Reggirizer v2", ... with the
+#   zips attached: a public download page you can send to anyone.
+name: Build plugins
+
+on:
+  push:
+    branches: [main]
+    tags: ["*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows
+          - os: macos-latest
+            label: macOS
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get JUCE 8.0.10
+        run: git clone --depth 1 --branch 8.0.10 https://github.com/juce-framework/JUCE.git JUCE
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Configure (macOS)
+        if: runner.os == 'macOS'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path build/Reggirizer_artefacts/Release/VST3/Reggirizer.vst3, INSTALL.txt `
+                           -DestinationPath dist/Reggirizer-Windows-VST3.zip
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist pkg-vst3 pkg-au
+          cp -R build/Reggirizer_artefacts/Release/VST3/Reggirizer.vst3 INSTALL.txt pkg-vst3/
+          cp -R build/Reggirizer_artefacts/Release/AU/Reggirizer.component INSTALL.txt pkg-au/
+          (cd pkg-vst3 && ditto -c -k . ../dist/Reggirizer-macOS-VST3.zip)
+          (cd pkg-au && ditto -c -k . ../dist/Reggirizer-macOS-AU.zip)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Reggirizer-${{ matrix.label }}
+          path: dist/*
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s\n' \
+            "Download the zip for your computer, unzip it, and follow INSTALL.txt inside." \
+            "" \
+            "- **Windows (FL Studio, Ableton, etc.):** Reggirizer-Windows-VST3.zip" \
+            "- **Mac:** Reggirizer-macOS-VST3.zip (or the AU zip for Logic / GarageBand)" > notes.md
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Reggirizer ${GITHUB_REF_NAME##*-}" \
+            --notes-file notes.md

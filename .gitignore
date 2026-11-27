@@ -1,0 +1,10 @@
+build/
+.tools/
+JUCE/
+.DS_Store
+build-snap/
+Release/
+build-win/
+dist/
+pkg-vst3/
+pkg-au/
